@@ -13,7 +13,7 @@ def _pace_str(sec: float) -> str:
 
 def _build_df(activities: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(activities)
-    df["start_date_local"] = pd.to_datetime(df["start_date_local"])
+    df["start_date_local"] = pd.to_datetime(df["start_date_local"]).dt.tz_localize(None)
     df["distance_km"] = df["distance"] / 1000
     df["pace_sec"] = df.apply(
         lambda r: r["moving_time"] / r["distance_km"] if r["distance_km"] > 0 else None,
@@ -43,8 +43,8 @@ def main():
     df = _build_df(activities)
 
     # ── 상단 메트릭 타일 ──────────────────────────────────────────────
-    week_start = pd.Timestamp.now(tz=None).to_period("W").start_time
-    weekly = df[df["start_date_local"] >= week_start]
+    week_start = pd.Timestamp.now().normalize().to_period("W").start_time
+    weekly = df[df["start_date_local"].dt.date >= week_start.date()]
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("이번 주 누적 거리", f"{weekly['distance_km'].sum():.1f} km")
