@@ -214,7 +214,7 @@ st.line_chart
 
 ---
 
-### [ ] Streamlit Community Cloud 무료 웹 배포  ← GitHub 푸시 후 수동 진행
+### [x] Streamlit Community Cloud 무료 웹 배포
 
 * GitHub 레포지토리 커밋
 * Streamlit Cloud 연동
