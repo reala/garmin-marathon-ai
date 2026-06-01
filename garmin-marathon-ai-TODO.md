@@ -245,3 +245,72 @@ st.line_chart
 
 * 텔레그램 챗봇 리스너 비동기 루프를 백그라운드에서 상시 구동
 * 사용자 실시간 질문에 실시간 대응 체제 구축
+
+---
+
+# 4. 🚀 Phase 3: Railway Cron Job 배포 (실시간 자동화)
+
+## [x] 3.1 Cron Job 파이프라인 구축
+
+### `app/cron_pipeline.py`
+
+* 5분마다 자동 실행되는 Strava 폴링
+* 새 러닝 감지 → Gemini 분석 → 텔레그램 알림
+* Webhook 불필요 (안정적인 폴링 방식)
+
+---
+
+## [x] 3.2 Railway Cron Job 배포
+
+* Schedule: `*/5 * * * *` (5분마다)
+* 환경변수 설정 (Strava, Gemini, Telegram)
+* 무료 티어 내에서 24/7 운영
+
+---
+
+## ✅ 최종 완성
+
+### 아키텍처
+
+```
+📊 Streamlit Cloud (대시보드)
+   ↑
+   └─ 주간 거리, 페이스 추이, 최근 기록
+
+⚙️ Railway Cron Job (파이프라인)
+   ├─ 5분마다 자동 실행
+   ├─ Strava API (최근 러닝 조회)
+   ├─ Gemini 2.0 Flash (AI 분석)
+   └─ Telegram (실시간 알림)
+
+💾 GitHub (데이터)
+   └─ processed_activities.json
+```
+
+### 비용
+
+* Streamlit Cloud: 무료
+* Railway: $0 (월 $5 크레딧 충분)
+* Gemini: 무료 쿼터 (20 RPD)
+* Telegram: 무료
+
+**총 월 비용: $0 ✅**
+
+### 작동 흐름
+
+```
+러닝 완료
+  ↓
+Strava 업로드
+  ↓
+Railway Cron (5분마다 확인)
+  ↓
+새 러닝 감지
+  ↓
+Gemini 페이스/심박 분석
+  ↓
+🔔 텔레그램 즉시 알림
+  ↓
+히스토리 갱신
+```
+
