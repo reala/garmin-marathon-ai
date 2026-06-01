@@ -4,7 +4,7 @@ import logging
 from app.client.strava_client import get_recent_activities
 from app.agents.coach_agent import generate_coaching_report
 from app.notifiers.telegram_notifier import send_message
-from app.storage.history_manager import is_processed, mark_processed
+from app.storage.history_manager import is_processed, mark_processed, save_coaching_report
 from app.bot.chatbot_handler import build_application
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -23,8 +23,14 @@ def run_pipeline() -> None:
             continue
 
         log.info(f"새 액티비티 발견: {activity['name']} (id={aid})")
-        report = generate_coaching_report(activity)
-        send_message(report)
+        text_report, structured_data = generate_coaching_report(activity)
+
+        # 코칭 데이터 저장
+        save_coaching_report(aid, structured_data)
+        log.info(f"코칭 데이터 저장: id={aid}")
+
+        # 텔레그램 발송
+        send_message(text_report)
         mark_processed(aid)
         new_count += 1
         log.info(f"분석 완료 및 히스토리 갱신: id={aid}")

@@ -193,7 +193,7 @@ generate_coaching_report(activity_data)
 
 ## 📌 Milestone 4: Streamlit 무료 웹 대시보드 시각화 및 배포
 
-### [x] `app/dashboard.py` - 로컬 대시보드 UI 구축
+### [x] `app/dashboard.py` - 로컬 대시보드 UI 구축 (Phase 1)
 
 ### UI 요구사항
 
@@ -211,6 +211,25 @@ st.line_chart
 
 * 일자별 러닝 거리 추이
 * 일자별 페이스 추이 선그래프
+
+---
+
+### [x] `app/dashboard.py` - 대시보드 고도화 (Phase 2: AI 코칭 동적 바인딩)
+
+#### 레이아웃 개편: [요약 메트릭 → 🤖 AI 기술 판단 → 📈 기술 지표 시각화]
+
+* **섹션 1: 오늘 액티비티 메트릭**
+  * 오늘 러닝의 [거리(km), 평균 페이스, 평균 심박수, 운동 시간] st.columns(4) 타일 배치
+  * 목표 페이스(5'12") 대비 delta 증감 수치 동적 표시 (초록/빨강)
+
+* **섹션 2: 🤖 AI 러닝 코치 기술 판단**
+  * `data/coaching_reports.json`에서 최신 액티비티 ID 매핑 데이터 로드
+  * AI 종합 판정, 페이스 적정성, 심박수 피드백, 다음 훈련 제안을 st.success/info/warning으로 시각화
+
+* **섹션 3: ⏱️ 구간별 페이스 및 심박수 추이**
+  * strava_client.py의 get_activity_detail(activity_id) 함수로 splits_metric 조회
+  * 1km당 페이스 변화 선그래프 표시
+  * 심박수 추이 선그래프 표시 (병렬 차트)
 
 ---
 

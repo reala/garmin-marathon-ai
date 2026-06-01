@@ -11,7 +11,7 @@ import sys
 from app.client.strava_client import get_recent_activities
 from app.agents.coach_agent import generate_coaching_report
 from app.notifiers.telegram_notifier import send_message
-from app.storage.history_manager import is_processed, mark_processed
+from app.storage.history_manager import is_processed, mark_processed, save_coaching_report
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,13 +49,17 @@ def run():
             log.info(f"🔍 새 활동 발견: {activity['name']} (id={aid})")
 
             try:
-                # Gemini 분석
+                # Gemini 분석 (텍스트 + 구조화된 JSON)
                 log.info(f"🤖 분석 중: {activity['name']}")
-                report = generate_coaching_report(activity)
+                text_report, structured_data = generate_coaching_report(activity)
+
+                # 코칭 데이터 저장
+                save_coaching_report(aid, structured_data)
+                log.info(f"💾 코칭 데이터 저장 완료: id={aid}")
 
                 # 텔레그램 발송
                 log.info(f"💬 텔레그램 발송 중...")
-                send_message(report)
+                send_message(text_report)
 
                 # 히스토리 갱신
                 mark_processed(aid)

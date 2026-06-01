@@ -3,6 +3,7 @@ from app.config import get
 
 _TOKEN_URL = "https://www.strava.com/oauth/token"
 _ACTIVITIES_URL = "https://www.strava.com/api/v3/athlete/activities"
+_ACTIVITY_DETAIL_URL = "https://www.strava.com/api/v3/activities"
 
 _ACTIVITY_FIELDS = [
     "id",
@@ -51,3 +52,25 @@ def get_recent_activities(per_page: int = 30) -> list[dict]:
         activities.append({k: item.get(k) for k in _ACTIVITY_FIELDS})
 
     return activities
+
+
+def get_activity_detail(activity_id: int) -> dict | None:
+    """특정 활동의 상세 정보 조회 (splits 포함)."""
+    try:
+        token = refresh_access_token()
+        resp = requests.get(
+            f"{_ACTIVITY_DETAIL_URL}/{activity_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        detail = resp.json()
+
+        if detail.get("type") != "Run":
+            return None
+
+        result = {k: detail.get(k) for k in _ACTIVITY_FIELDS}
+        result["splits_metric"] = detail.get("splits_metric", [])
+        return result
+    except Exception:
+        return None
