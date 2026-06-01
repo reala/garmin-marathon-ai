@@ -4,5 +4,3 @@ requests
 pandas
 python-telegram-bot==20.*
 streamlit
-flask
-gunicorn
