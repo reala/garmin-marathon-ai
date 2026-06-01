@@ -1,0 +1,24 @@
+# 환경변수 — 절대 커밋 금지
+.env
+.env.local
+
+# Streamlit Cloud 시크릿
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# 데이터 (히스토리는 로컬 전용)
+data/processed_activities.json
+
+# IDE
+.DS_Store
+.vscode/
+.idea/

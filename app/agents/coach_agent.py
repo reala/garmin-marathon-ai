@@ -1,0 +1,73 @@
+from google import genai
+from app.config import get
+
+_TARGET_PACE_SEC = 5 * 60 + 12  # 5분 12초/km
+_TARGET_FINISH_MIN = 110         # 1시간 50분
+
+_HR_ZONES = [
+    (0, 114, "Zone 1 (회복)"),
+    (115, 133, "Zone 2 (유산소)"),
+    (134, 152, "Zone 3 (템포)"),
+    (153, 171, "Zone 4 (역치)"),
+    (172, 999, "Zone 5 (최대)"),
+]
+
+
+def _zone_label(hr: float | None) -> str:
+    if hr is None:
+        return "측정 없음"
+    for lo, hi, label in _HR_ZONES:
+        if lo <= hr <= hi:
+            return label
+    return "알 수 없음"
+
+
+def _pace_str(seconds_per_km: float) -> str:
+    m, s = divmod(int(seconds_per_km), 60)
+    return f"{m}분 {s:02d}초/km"
+
+
+def _build_prompt(activity: dict) -> str:
+    distance_km = (activity.get("distance") or 0) / 1000
+    moving_time_sec = activity.get("moving_time") or 0
+    pace_sec = (moving_time_sec / distance_km) if distance_km > 0 else 0
+    pace_diff = pace_sec - _TARGET_PACE_SEC
+    diff_sign = "느림" if pace_diff > 0 else "빠름"
+
+    avg_hr = activity.get("average_heartrate")
+    max_hr = activity.get("max_heartrate")
+
+    return f"""당신은 10년 경력의 전문 러닝 코치입니다.
+아래 러닝 데이터를 분석하고, 하프마라톤 1시간 50분 완주를 위한 맞춤 피드백을 제공하세요.
+
+## 🎯 목표
+- 완주 목표: 하프마라톤 1시간 50분 ({_TARGET_FINISH_MIN}분) 이내
+- 목표 평균 페이스: {_pace_str(_TARGET_PACE_SEC)}
+
+## 📊 이번 러닝 데이터
+- 이름: {activity.get('name', '러닝')}
+- 날짜: {activity.get('start_date_local', '알 수 없음')}
+- 거리: {distance_km:.2f} km
+- 러닝 시간: {moving_time_sec // 60}분 {moving_time_sec % 60}초
+- 실제 평균 페이스: {_pace_str(pace_sec)} (목표 대비 {abs(pace_diff):.0f}초 {diff_sign})
+- 고도 상승: {activity.get('total_elevation_gain', 0)} m
+- 평균 심박수: {avg_hr if avg_hr else '측정 없음'} bpm → {_zone_label(avg_hr)}
+- 최대 심박수: {max_hr if max_hr else '측정 없음'} bpm
+
+## 📝 분석 요청
+1. 현재 페이스와 목표 페이스 격차 평가
+2. 심박수 구간 기반 훈련 효율 피드백
+3. 다음 훈련에서 개선할 구체적 포인트 2가지
+4. 1시간 50분 완주까지 예상 소요 훈련 기간
+
+한글로 작성하고, 이모지를 활용해 가독성을 높여주세요. 총 400자 이내로 간결하게."""
+
+
+def generate_coaching_report(activity: dict) -> str:
+    """Gemini 2.0 Flash로 코칭 리포트 생성 (1-Turn 호출)."""
+    client = genai.Client(api_key=get("GEMINI_API_KEY"))
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=_build_prompt(activity),
+    )
+    return response.text
