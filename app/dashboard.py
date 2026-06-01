@@ -7,6 +7,16 @@ from app.storage.history_manager import get_latest_coaching_report
 _TARGET_PACE_SEC = 5 * 60 + 12
 
 
+@st.cache_data(ttl=300)
+def _fetch_activities(per_page: int = 50) -> list[dict]:
+    return get_recent_activities(per_page=per_page)
+
+
+@st.cache_data(ttl=300)
+def _fetch_activity_detail(activity_id: int) -> dict | None:
+    return get_activity_detail(activity_id)
+
+
 def _pace_str(sec: float) -> str:
     m, s = divmod(int(sec), 60)
     return f"{m}'{s:02d}\""
@@ -25,13 +35,15 @@ def _build_df(activities: list[dict]) -> pd.DataFrame:
     return df
 
 
-def _get_today_activity(df: pd.DataFrame) -> dict | None:
-    """오늘의 액티비티 조회."""
+def _get_latest_activity(df: pd.DataFrame) -> tuple[dict | None, bool]:
+    """최신 액티비티 조회. 오늘 기록이 있으면 (activity, True), 없으면 마지막 기록 (activity, False) 반환."""
     today = pd.Timestamp.now(tz=None).date()
     today_activities = df[df["start_date_local"].dt.date == today]
     if len(today_activities) > 0:
-        return today_activities.iloc[-1].to_dict()
-    return None
+        return today_activities.iloc[-1].to_dict(), True
+    if len(df) > 0:
+        return df.iloc[-1].to_dict(), False
+    return None, False
 
 
 def _build_splits_chart(splits_metric: list) -> pd.DataFrame | None:
@@ -59,7 +71,7 @@ def main():
 
     with st.spinner("Strava 데이터 불러오는 중..."):
         try:
-            activities = get_recent_activities(per_page=50)
+            activities = _fetch_activities(per_page=50)
         except Exception as e:
             st.error(f"Strava API 오류: {e}")
             return
@@ -70,11 +82,13 @@ def main():
 
     df = _build_df(activities)
 
-    # ── 섹션 1: 오늘 액티비티 메트릭 ──────────────────────────────────
-    st.subheader("📊 오늘의 러닝 기록")
-    today_activity = _get_today_activity(df)
+    # ── 섹션 1: 최신 액티비티 메트릭 ─────────────────────────────────
+    latest_activity, is_today = _get_latest_activity(df)
+    section_title = "📊 오늘의 러닝 기록" if is_today else f"📊 마지막 러닝 기록 ({pd.Timestamp(latest_activity['start_date_local']).strftime('%Y-%m-%d') if latest_activity else ''})"
+    st.subheader(section_title)
 
-    if today_activity:
+    if latest_activity:
+        today_activity = latest_activity
         distance_km = today_activity.get("distance_km", 0)
         moving_time_sec = today_activity.get("moving_time", 0)
         avg_hr = today_activity.get("average_heartrate")
@@ -135,7 +149,7 @@ def main():
 
         today_activity_id = today_activity.get("id")
         if today_activity_id:
-            detail = get_activity_detail(today_activity_id)
+            detail = _fetch_activity_detail(today_activity_id)
             if detail and detail.get("splits_metric"):
                 splits_df = _build_splits_chart(detail["splits_metric"])
                 if splits_df is not None and len(splits_df) > 0:
@@ -158,9 +172,6 @@ def main():
                     st.info("구간별 데이터가 아직 준비 중입니다.")
             else:
                 st.info("구간별 데이터가 아직 준비 중입니다.")
-
-    else:
-        st.info("📅 오늘 러닝 기록이 없습니다.")
 
     st.divider()
 
@@ -186,7 +197,40 @@ def main():
 
     st.divider()
 
-    # ── 섹션 5: 최근 러닝 목록 ──────────────────────────────────────────
+    # ── 섹션 5: 월간 통계 ────────────────────────────────────────────────
+    st.subheader("🗓️ 월간 통계")
+    now = pd.Timestamp.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly = df[df["start_date_local"] >= month_start]
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric(f"{now.month}월 누적 거리", f"{monthly['distance_km'].sum():.1f} km")
+    col2.metric(f"{now.month}월 러닝 횟수", f"{len(monthly)} 회")
+
+    if len(monthly) > 0:
+        monthly_avg_pace = monthly["pace_sec"].mean()
+        monthly_pace_diff = monthly_avg_pace - _TARGET_PACE_SEC
+        col3.metric(
+            "이번 달 평균 페이스",
+            _pace_str(monthly_avg_pace),
+            delta=f"목표 대비 {abs(monthly_pace_diff):.0f}초 {'느림' if monthly_pace_diff > 0 else '빠름'}",
+            delta_color="inverse",
+        )
+        monthly_avg_hr = monthly["average_heartrate"].dropna().mean()
+        col4.metric("이번 달 평균 심박수", f"{monthly_avg_hr:.0f} bpm" if not pd.isna(monthly_avg_hr) else "N/A")
+    else:
+        col3.metric("이번 달 평균 페이스", "N/A")
+        col4.metric("이번 달 평균 심박수", "N/A")
+
+    if len(monthly) > 0:
+        monthly_chart = monthly.set_index("start_date_local")[["distance_km"]].copy()
+        monthly_chart.index = monthly_chart.index.strftime("%m/%d")
+        st.bar_chart(monthly_chart, use_container_width=True)
+        st.caption("이번 달 일별 러닝 거리 (km)")
+
+    st.divider()
+
+    # ── 섹션 7: 최근 러닝 목록 ──────────────────────────────────────────
     st.subheader("📋 최근 러닝 기록")
     display = df[["start_date_local", "name", "distance_km", "pace_label", "average_heartrate", "total_elevation_gain"]].copy()
     display.columns = ["날짜", "이름", "거리(km)", "페이스", "평균 심박(bpm)", "고도(m)"]
