@@ -43,7 +43,7 @@ def main():
     df = _build_df(activities)
 
     # ── 상단 메트릭 타일 ──────────────────────────────────────────────
-    week_start = pd.Timestamp.now().to_period("W").start_time
+    week_start = pd.Timestamp.now(tz=None).to_period("W").start_time
     weekly = df[df["start_date_local"] >= week_start]
 
     col1, col2, col3, col4 = st.columns(4)
